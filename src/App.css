@@ -95,3 +95,25 @@ h2 {
   text-decoration: none;
   font-size: 13px;
 }
+.fc-event {
+  border: none;
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 2px;
+}
+
+.event-client-a {
+  background: #4f8ef7;
+}
+
+.event-client-b {
+  background: #54b56b;
+}
+
+.event-transfer {
+  background: #f0ad4e;
+  color: #222;
+}
+.fc-bg-event {
+  opacity: 0.75 !important;
+}

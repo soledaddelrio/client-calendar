@@ -1,8 +1,8 @@
-# Custody Calendar - Requirements
+# Client Calendar - Requirements
 
 ## Project Goal
 
-Create a mobile-friendly custody calendar for one family that accurately calculates parenting time according to the Texas Standard Possession Order while allowing manual modifications, notes, and court-ready reports.
+Create a mobile-friendly calendar application for one family that accurately calculates parenting time according to the Texas Standard Possession Order while allowing manual modifications, notes, and court-ready reports.
 
 ---
 
