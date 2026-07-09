@@ -1,9 +1,4 @@
-export type ScheduleBlock = {
-  client: 'A' | 'B'
-  start: string
-  end: string
-  type: 'possession'
-}
+import type { ScheduleBlock } from '../types/schedule'
 
 export const sampleSchedule: ScheduleBlock[] = [
   {

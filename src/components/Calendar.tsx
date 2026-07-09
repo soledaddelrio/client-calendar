@@ -1,16 +1,20 @@
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { sampleSchedule } from '../data/sampleSchedule'
+import { buildSchedule } from '../data/buildSchedule'
+import { COLORS } from '../constants/colors'
 
-const sampleEvents = sampleSchedule.map((block) => ({
+
+const schedule = buildSchedule()
+
+const sampleEvents = schedule.map((block) => ({
   start: block.start,
   end: block.end,
   display: 'background',
   backgroundColor:
-    block.client === 'A'
-      ? '#77d4f9'
-      : '#F8D88A',
+  block.client === 'A'
+    ? COLORS.clientA
+    : COLORS.clientB,
 }))
 
 export default function Calendar() {
