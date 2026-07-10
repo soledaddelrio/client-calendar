@@ -1,10 +1,7 @@
 import type { ScheduleBlock } from '../types/schedule'
-import { everyOtherWeekend } from '../rules'
+import { rules } from './rules'
+import { buildRule } from '../rules/factory'
 
 export function buildSchedule(): ScheduleBlock[] {
-  const firstFriday = new Date('2026-07-10')
-
-  return [
-    ...everyOtherWeekend(firstFriday, 12, 'B'),
-  ]
+  return rules.flatMap(buildRule)
 }
