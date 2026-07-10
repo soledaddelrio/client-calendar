@@ -1,51 +1,84 @@
+import type { ScheduleBlock } from '../types/schedule'
+import { previousDay, nextDay } from '../utils/dateUtils'
+
 type DayPanelProps = {
   selectedDate: string | null
+  selectedBlock?: ScheduleBlock
   onClose: () => void
+  onSelectDate: (date: string) => void
 }
 
 export default function DayPanel({
   selectedDate,
+  selectedBlock,
   onClose,
+  onSelectDate,
 }: DayPanelProps) {
   if (!selectedDate) {
     return null
   }
 
   return (
-    <div className="day-panel-backdrop">
-      <aside className="day-panel">
-        <div className="day-panel-handle" />
+<div
+  className="day-panel-backdrop"
+  onClick={onClose}
+>
+<aside
+  className="day-panel"
+  onClick={(event) => event.stopPropagation()}
+>
+            <div className="day-panel-handle" />
 
-        <div className="day-panel-header">
-          <h2>{selectedDate}</h2>
+<div className="day-panel-header">
+  <button
+    type="button"
+    className="icon-button"
+    onClick={() => onSelectDate(previousDay(selectedDate))}
+    aria-label="Previous day"
+  >
+    ←
+  </button>
 
-          <button
-            type="button"
-            className="icon-button"
-            onClick={onClose}
-            aria-label="Close selected day"
-          >
-            ×
-          </button>
-        </div>
+  <h2>
+    {new Date(selectedDate).toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })}
+  </h2>
 
-        <div className="day-panel-row">
-          <span>Ordered</span>
-          <strong>—</strong>
-        </div>
+  <button
+    type="button"
+    className="icon-button"
+    onClick={() => onSelectDate(nextDay(selectedDate))}
+    aria-label="Next day"
+  >
+    →
+  </button>
+</div>
 
-        <div className="day-panel-row">
-          <span>Actual</span>
-          <strong>Not recorded</strong>
-        </div>
+        <section className="info-card">
+  <span className="info-label">Ordered</span>
+  <strong className="info-value">
+  {selectedBlock
+    ? `Client ${selectedBlock.client}`
+    : 'No assignment'}
+</strong>
+</section>
 
-        <div className="day-panel-row">
-          <span>Notes</span>
-          <strong>No notes</strong>
-        </div>
+<section className="info-card">
+  <span className="info-label">Actual</span>
+  <strong className="info-value">Pending</strong>
+</section>
+
+<section className="info-card">
+  <span className="info-label">Notes</span>
+  <strong className="info-value">0 notes</strong>
+</section>
 
         <button type="button" className="primary-button">
-          Edit
+          Record Activity
         </button>
       </aside>
     </div>

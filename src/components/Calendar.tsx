@@ -3,6 +3,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { buildSchedule } from '../data/buildSchedule'
 import { COLORS } from '../constants/colors'
+import { useEffect, useRef } from 'react'
 
 
 const schedule = buildSchedule()
@@ -18,19 +19,37 @@ const sampleEvents = schedule.map((block) => ({
 }))
 
 type CalendarProps = {
+  selectedDate?: string | null
   onDateClick?: (date: string) => void
 }
 
 export default function Calendar({
+  selectedDate,
   onDateClick,
 }: CalendarProps) {
+
+  const calendarRef = useRef<FullCalendar>(null)
+
+useEffect(() => {
+  if (!selectedDate) return
+
+  const api = calendarRef.current?.getApi()
+  api?.gotoDate(selectedDate)
+}, [selectedDate])
+
   return (
     <FullCalendar
+      ref={calendarRef}
       plugins={[dayGridPlugin, interactionPlugin]}
       initialView="dayGridMonth"
       height="auto"
       events={sampleEvents}
       dateClick={(info) => onDateClick?.(info.dateStr)}
+      dayCellClassNames={(arg) =>
+  arg.date.toISOString().slice(0, 10) === selectedDate
+    ? ['selected-day']
+    : []
+}
     />
   )
 }

@@ -120,7 +120,8 @@ h2 {
 .day-panel-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -130,11 +131,11 @@ h2 {
 .day-panel {
   width: 100%;
   max-width: 430px;
-  background: #fff;
-  border-radius: 20px 20px 0 0;
-  padding: 20px;
-  box-shadow: 0 -8px 30px rgba(0,0,0,.15);
-  animation: slideUp .25s ease;
+  background: #ffffff;
+  border-radius: 18px 18px 0 0;
+  padding: 20px 20px 32px;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.18);
+  animation: slideUp 220ms ease-out;
 }
 
 .day-panel-handle {
@@ -186,4 +187,32 @@ h2 {
   to {
     transform: translateY(0);
   }
+}
+.info-card {
+  background: #f8f9fb;
+  border: 1px solid #e7ebef;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.info-label {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.info-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 600;
+  color: #243447;
+}
+.selected-day {
+  outline: 3px solid #31435c;
+  outline-offset: -3px;
+  border-radius: 8px;
 }
