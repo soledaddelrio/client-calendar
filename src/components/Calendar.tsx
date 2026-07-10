@@ -17,13 +17,20 @@ const sampleEvents = schedule.map((block) => ({
     : COLORS.clientB,
 }))
 
-export default function Calendar() {
+type CalendarProps = {
+  onDateClick?: (date: string) => void
+}
+
+export default function Calendar({
+  onDateClick,
+}: CalendarProps) {
   return (
     <FullCalendar
       plugins={[dayGridPlugin, interactionPlugin]}
       initialView="dayGridMonth"
       height="auto"
       events={sampleEvents}
+      dateClick={(info) => onDateClick?.(info.dateStr)}
     />
   )
 }

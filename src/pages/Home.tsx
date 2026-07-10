@@ -1,9 +1,12 @@
 import Header from '../components/Header'
 import BottomNav from '../components/BottomNav'
 import Calendar from '../components/Calendar'
+import { useState } from 'react'
+import DayPanel from '../sidebar/DayPanel'
 
 
 export default function Home() {
+    const [selectedDate, setSelectedDate] = useState<string | null>(null)
   return (
     <div className="app-shell">
       <Header />
@@ -23,9 +26,15 @@ export default function Home() {
       </main>
 
 <section className="card">
-  <Calendar />
+  <Calendar
+  onDateClick={setSelectedDate}
+/>
 </section>
 
+<DayPanel
+  selectedDate={selectedDate}
+  onClose={() => setSelectedDate(null)}
+/>
       <BottomNav />
     </div>
   )
