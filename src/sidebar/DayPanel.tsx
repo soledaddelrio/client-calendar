@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
 import type { ActivityRecord } from "../types/activity";
 import type { ScheduleBlock } from "../types/schedule";
-import { previousDay, nextDay } from "../utils/dateUtils";
-import { getActivitiesByDate } from "../services/evidenceService";
+import {
+  previousDay,
+  nextDay,
+} from "../utils/dateUtils";
+import {
+  deleteActivity,
+  getActivitiesByDate,
+} from "../services/evidenceService";
 import EvidenceForm from "../components/EvidenceForm";
 
 type DayPanelProps = {
@@ -12,18 +18,36 @@ type DayPanelProps = {
   onSelectDate: (date: string) => void;
 };
 
+type FormActivity =
+  | ActivityRecord
+  | "new"
+  | null;
+
 export default function DayPanel({
   selectedDate,
   selectedBlock,
   onClose,
   onSelectDate,
 }: DayPanelProps) {
-  const [isRecording, setIsRecording] = useState(false);
-  const [activities, setActivities] = useState<ActivityRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [formActivity, setFormActivity] =
+    useState<FormActivity>(null);
+
+  const [activities, setActivities] =
+    useState<ActivityRecord[]>([]);
+
+  const [isLoading, setIsLoading] =
+    useState(false);
+
+  const isRecording = formActivity !== null;
+
+  const editingActivity =
+    formActivity === "new" ||
+    formActivity === null
+      ? undefined
+      : formActivity;
 
   useEffect(() => {
-    setIsRecording(false);
+    setFormActivity(null);
   }, [selectedDate]);
 
   useEffect(() => {
@@ -79,11 +103,34 @@ export default function DayPanel({
       await getActivitiesByDate(activeDate);
 
     setActivities(savedActivities);
-    setIsRecording(false);
+    setFormActivity(null);
   }
 
-  const notesCount = activities.filter((activity) =>
-    activity.notes.trim(),
+  async function handleDelete(
+    activity: ActivityRecord,
+  ) {
+    const confirmed = window.confirm(
+      "Delete this evidence record? This cannot be undone.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await deleteActivity(activity.id);
+
+    const savedActivities =
+      await getActivitiesByDate(activeDate);
+
+    setActivities(savedActivities);
+
+    if (editingActivity?.id === activity.id) {
+      setFormActivity(null);
+    }
+  }
+
+  const notesCount = activities.filter(
+    (activity) => activity.notes.trim(),
   ).length;
 
   const sortedActivities = activities
@@ -101,7 +148,9 @@ export default function DayPanel({
     >
       <aside
         className="day-panel"
-        onClick={(event) => event.stopPropagation()}
+        onClick={(event) =>
+          event.stopPropagation()
+        }
       >
         <div className="day-panel-handle" />
 
@@ -110,7 +159,9 @@ export default function DayPanel({
             type="button"
             className="icon-button"
             onClick={() =>
-              onSelectDate(previousDay(activeDate))
+              onSelectDate(
+                previousDay(activeDate),
+              )
             }
             aria-label="Previous day"
           >
@@ -187,66 +238,109 @@ export default function DayPanel({
             </p>
           ) : sortedActivities.length === 0 ? (
             <p className="empty-timeline">
-              No evidence recorded for this day.
+              No evidence recorded for this
+              day.
             </p>
           ) : (
-            sortedActivities.map((activity) => (
-              <article
-                key={activity.id}
-                className="evidence-item"
-              >
-                <div className="evidence-time">
-                  {new Date(
-                    activity.eventAt,
-                  ).toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                </div>
+            sortedActivities.map(
+              (activity) => (
+                <article
+                  key={activity.id}
+                  className="evidence-item"
+                >
+                  <div className="evidence-time">
+                    {new Date(
+                      activity.eventAt,
+                    ).toLocaleTimeString(
+                      "en-US",
+                      {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      },
+                    )}
+                  </div>
 
-                <div className="evidence-content">
-                  <strong className="evidence-title">
-                    {activity.type
-                      .replaceAll("-", " ")
-                      .replace(
-                        /\b\w/g,
-                        (letter) =>
-                          letter.toUpperCase(),
-                      )}
-                  </strong>
+                  <div className="evidence-content">
+                    <strong className="evidence-title">
+                      {activity.type
+                        .replaceAll("-", " ")
+                        .replace(
+                          /\b\w/g,
+                          (letter) =>
+                            letter.toUpperCase(),
+                        )}
+                    </strong>
 
-                  <span className="evidence-client">
-                    {activity.client === "client-a"
-                      ? "Client A"
-                      : "Client B"}
-                  </span>
+                    <span className="evidence-client">
+                      {activity.client ===
+                      "client-a"
+                        ? "Client A"
+                        : "Client B"}
+                    </span>
 
-                  {activity.notes.trim() && (
-                    <p>{activity.notes}</p>
-                  )}
-                </div>
-              </article>
-            ))
+                    <div className="evidence-actions">
+                      <button
+                        type="button"
+                        className="evidence-edit-button"
+                        onClick={() => {
+                          setFormActivity(
+                            activity,
+                          );
+                        }}
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        className="evidence-delete-button"
+                        onClick={() => {
+                          void handleDelete(
+                            activity,
+                          );
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+
+                    {activity.notes.trim() && (
+                      <p>{activity.notes}</p>
+                    )}
+                  </div>
+                </article>
+              ),
+            )
           )}
         </section>
 
+
+
+
         {isRecording ? (
           <EvidenceForm
+            key={
+              editingActivity?.id ??
+              "new-evidence"
+            }
             selectedDate={activeDate}
+            existingActivity={
+              editingActivity
+            }
             onSaved={() => {
               void handleSaved();
             }}
-            onCancel={() =>
-              setIsRecording(false)
-            }
+            onCancel={() => {
+              setFormActivity(null);
+            }}
           />
         ) : (
           <button
             type="button"
             className="primary-button"
-            onClick={() =>
-              setIsRecording(true)
-            }
+            onClick={() => {
+              setFormActivity("new");
+            }}
           >
             Add Evidence
           </button>

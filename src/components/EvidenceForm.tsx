@@ -5,10 +5,14 @@ import type {
   ActivityType,
   EvidenceCategory,
 } from "../types/activity";
-import { addActivity } from "../services/evidenceService";
+import {
+  addActivity,
+  updateActivity,
+} from "../services/evidenceService";
 
 interface EvidenceFormProps {
   selectedDate: string;
+  existingActivity?: ActivityRecord;
   onSaved: () => void;
   onCancel: () => void;
 }
@@ -30,29 +34,58 @@ type CommunicationDirection =
 
 export default function EvidenceForm({
   selectedDate,
+  existingActivity,
   onSaved,
   onCancel,
 }: EvidenceFormProps) {
+  const initialCategory =
+    existingActivity?.category ??
+    getLegacyCategory(existingActivity);
+
+  const initialCommunication =
+    parseCommunicationNotes(existingActivity?.notes);
+
   const [category, setCategory] =
-    useState<EvidenceCategory>("exchange");
+    useState<EvidenceCategory>(initialCategory);
 
   const [type, setType] =
-    useState<ActivityType>("pickup");
+    useState<ActivityType>(
+      existingActivity?.type ?? "pickup",
+    );
 
   const [client, setClient] =
-    useState<ActivityClient>("client-b");
+    useState<ActivityClient>(
+      existingActivity?.client ?? "client-b",
+    );
 
-  const [time, setTime] = useState("18:00");
-  const [notes, setNotes] = useState("");
+  const [time, setTime] = useState(
+    existingActivity
+      ? getTimeFromEventAt(existingActivity.eventAt)
+      : "18:00",
+  );
+
+  const [notes, setNotes] = useState(
+    initialCategory === "communication"
+      ? initialCommunication.details
+      : existingActivity?.notes ?? "",
+  );
 
   const [communicationMethod, setCommunicationMethod] =
-    useState<CommunicationMethod>("text-message");
+    useState<CommunicationMethod>(
+      initialCommunication.method,
+    );
 
-  const [communicationDirection, setCommunicationDirection] =
-    useState<CommunicationDirection>("received");
+  const [
+    communicationDirection,
+    setCommunicationDirection,
+  ] = useState<CommunicationDirection>(
+    initialCommunication.direction,
+  );
 
-  const [communicationSubject, setCommunicationSubject] =
-    useState("");
+  const [
+    communicationSubject,
+    setCommunicationSubject,
+  ] = useState(initialCommunication.subject);
 
   function handleCategoryChange(
     newCategory: EvidenceCategory,
@@ -102,10 +135,14 @@ export default function EvidenceForm({
     const now = new Date().toISOString();
 
     const activity: ActivityRecord = {
-      id: crypto.randomUUID(),
+      id:
+        existingActivity?.id ??
+        crypto.randomUUID(),
       category,
       eventAt: `${selectedDate}T${time}`,
-      createdAt: now,
+      sourceAt: existingActivity?.sourceAt,
+      createdAt:
+        existingActivity?.createdAt ?? now,
       updatedAt: now,
       type:
         category === "exchange"
@@ -113,22 +150,38 @@ export default function EvidenceForm({
           : "note",
       client,
       notes: buildNotes(),
-      entryMethod: "live",
-      sourceFiles: [],
-      isApproximate: false,
-      reviewStatus: "confirmed",
+      entryMethod:
+        existingActivity?.entryMethod ?? "live",
+      sourceType: existingActivity?.sourceType,
+      sourceFiles:
+        existingActivity?.sourceFiles ?? [],
+      isApproximate:
+        existingActivity?.isApproximate ?? false,
+      reviewStatus:
+        existingActivity?.reviewStatus ??
+        "confirmed",
     };
 
-    await addActivity(activity);
+    if (existingActivity) {
+      await updateActivity(activity);
+    } else {
+      await addActivity(activity);
+    }
+
     onSaved();
   }
 
-  return (
-    <form
-      className="evidence-form"
-      onSubmit={handleSubmit}
-    >
-      <h3>Add Evidence</h3>
+ return (
+  <form
+    className="evidence-form"
+    onSubmit={handleSubmit}
+  >
+    
+      <h3>
+        {existingActivity
+          ? "Edit Evidence"
+          : "Add Evidence"}
+      </h3>
 
       <div className="evidence-type-grid">
         <EvidenceCategoryButton
@@ -141,11 +194,15 @@ export default function EvidenceForm({
         />
 
         <EvidenceCategoryButton
-          active={category === "communication"}
+          active={
+            category === "communication"
+          }
           icon="💬"
           label="Communication"
           onClick={() =>
-            handleCategoryChange("communication")
+            handleCategoryChange(
+              "communication",
+            )
           }
         />
 
@@ -212,7 +269,8 @@ export default function EvidenceForm({
               value={type}
               onChange={(event) =>
                 setType(
-                  event.target.value as ActivityType,
+                  event.target
+                    .value as ActivityType,
                 )
               }
             >
@@ -398,7 +456,9 @@ export default function EvidenceForm({
         </button>
 
         <button type="submit">
-          Save Evidence
+          {existingActivity
+            ? "Save Changes"
+            : "Save Evidence"}
         </button>
       </div>
     </form>
@@ -455,7 +515,8 @@ function ClientField({
         value={client}
         onChange={(event) =>
           setClient(
-            event.target.value as ActivityClient,
+            event.target
+              .value as ActivityClient,
           )
         }
       >
@@ -521,6 +582,112 @@ function NotesField({
       />
     </label>
   );
+}
+
+function getTimeFromEventAt(
+  eventAt: string,
+) {
+  const time = eventAt.split("T")[1];
+
+  return time?.slice(0, 5) || "18:00";
+}
+
+function getLegacyCategory(
+  activity?: ActivityRecord,
+): EvidenceCategory {
+  if (!activity) {
+    return "exchange";
+  }
+
+  return activity.type === "note"
+    ? "note"
+    : "exchange";
+}
+
+function parseCommunicationNotes(
+  notes = "",
+): {
+  method: CommunicationMethod;
+  direction: CommunicationDirection;
+  subject: string;
+  details: string;
+} {
+  const methodMatch = notes.match(
+    /^Communication method:\s*(.+)$/m,
+  );
+
+  const directionMatch = notes.match(
+    /^Direction:\s*(.+)$/m,
+  );
+
+  const subjectMatch = notes.match(
+    /^Subject:\s*(.+)$/m,
+  );
+
+  const detailsMatch = notes.match(
+    /^Details:\s*([\s\S]*)$/m,
+  );
+
+  return {
+    method: toCommunicationMethod(
+      methodMatch?.[1],
+    ),
+    direction: toCommunicationDirection(
+      directionMatch?.[1],
+    ),
+    subject: subjectMatch?.[1]?.trim() ?? "",
+    details:
+      detailsMatch?.[1]?.trim() ??
+      notes,
+  };
+}
+
+function toCommunicationMethod(
+  value?: string,
+): CommunicationMethod {
+  const normalized = value
+    ?.trim()
+    .toLowerCase()
+    .replaceAll(" ", "-");
+
+  const validMethods: CommunicationMethod[] = [
+    "text-message",
+    "email",
+    "phone-call",
+    "voicemail",
+    "parenting-app",
+    "in-person",
+    "other",
+  ];
+
+  return validMethods.includes(
+    normalized as CommunicationMethod,
+  )
+    ? (normalized as CommunicationMethod)
+    : "text-message";
+}
+
+function toCommunicationDirection(
+  value?: string,
+): CommunicationDirection {
+  const normalized = value
+    ?.trim()
+    .toLowerCase()
+    .replaceAll(" ", "-");
+
+  const validDirections: CommunicationDirection[] =
+    [
+      "received",
+      "sent",
+      "conversation",
+      "no-response",
+    ];
+
+  return validDirections.includes(
+    normalized as CommunicationDirection,
+  )
+    ? (normalized as CommunicationDirection)
+    : "received";
 }
 
 function formatLabel(value: string) {
