@@ -1,37 +1,42 @@
+import { db } from "./database";
 import type { ActivityRecord } from "../types/activity";
 
-const activities: ActivityRecord[] = [];
-
-export function getActivities(): ActivityRecord[] {
-  return activities;
+export async function getActivities(): Promise<ActivityRecord[]> {
+  return db.activities.orderBy("eventAt").toArray();
 }
 
-export function getActivitiesByDate(date: string): ActivityRecord[] {
-  return activities.filter(activity =>
-    activity.eventAt.startsWith(date)
-  );
+export async function getActivitiesByDate(
+  date: string,
+): Promise<ActivityRecord[]> {
+  const start = `${date}T00:00`;
+  const end = `${date}T23:59:59`;
+
+  return db.activities
+    .where("eventAt")
+    .between(start, end, true, true)
+    .toArray();
 }
 
-export function getActivity(id: string): ActivityRecord | undefined {
-  return activities.find(activity => activity.id === id);
+export async function getActivity(
+  id: string,
+): Promise<ActivityRecord | undefined> {
+  return db.activities.get(id);
 }
 
-export function addActivity(activity: ActivityRecord): void {
-  activities.push(activity);
+export async function addActivity(
+  activity: ActivityRecord,
+): Promise<void> {
+  await db.activities.add(activity);
 }
 
-export function updateActivity(updated: ActivityRecord): void {
-  const index = activities.findIndex(a => a.id === updated.id);
-
-  if (index >= 0) {
-    activities[index] = updated;
-  }
+export async function updateActivity(
+  activity: ActivityRecord,
+): Promise<void> {
+  await db.activities.put(activity);
 }
 
-export function deleteActivity(id: string): void {
-  const index = activities.findIndex(a => a.id === id);
-
-  if (index >= 0) {
-    activities.splice(index, 1);
-  }
+export async function deleteActivity(
+  id: string,
+): Promise<void> {
+  await db.activities.delete(id);
 }

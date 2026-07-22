@@ -1,15 +1,16 @@
-import { useEffect, useState } from "react"
-import type { ScheduleBlock } from "../types/schedule"
-import { previousDay, nextDay } from "../utils/dateUtils"
-import { getActivitiesByDate } from "../services/evidenceService"
-import RecordActivityForm from "../components/EvidenceForm"
+import { useEffect, useState } from "react";
+import type { ActivityRecord } from "../types/activity";
+import type { ScheduleBlock } from "../types/schedule";
+import { previousDay, nextDay } from "../utils/dateUtils";
+import { getActivitiesByDate } from "../services/evidenceService";
+import EvidenceForm from "../components/EvidenceForm";
 
 type DayPanelProps = {
-  selectedDate: string | null
-  selectedBlock?: ScheduleBlock
-  onClose: () => void
-  onSelectDate: (date: string) => void
-}
+  selectedDate: string | null;
+  selectedBlock?: ScheduleBlock;
+  onClose: () => void;
+  onSelectDate: (date: string) => void;
+};
 
 export default function DayPanel({
   selectedDate,
@@ -17,29 +18,86 @@ export default function DayPanel({
   onClose,
   onSelectDate,
 }: DayPanelProps) {
-  const [isRecording, setIsRecording] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [isRecording, setIsRecording] = useState(false);
+  const [activities, setActivities] = useState<ActivityRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-  setIsRecording(false)
-}, [selectedDate])
+    setIsRecording(false);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (!selectedDate) {
+      setActivities([]);
+      return;
+    }
+
+    const activeDate = selectedDate;
+    let isCurrent = true;
+
+    async function loadActivities() {
+      setIsLoading(true);
+
+      try {
+        const savedActivities =
+          await getActivitiesByDate(activeDate);
+
+        if (isCurrent) {
+          setActivities(savedActivities);
+        }
+      } catch (error) {
+        console.error(
+          "Unable to load evidence:",
+          error,
+        );
+
+        if (isCurrent) {
+          setActivities([]);
+        }
+      } finally {
+        if (isCurrent) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadActivities();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedDate]);
 
   if (!selectedDate) {
-    return null
+    return null;
   }
 
-  const activities = getActivitiesByDate(selectedDate)
+  const activeDate = selectedDate;
 
-  function handleSaved() {
-    setIsRecording(false)
-    setRefreshKey((current) => current + 1)
+  async function handleSaved() {
+    const savedActivities =
+      await getActivitiesByDate(activeDate);
+
+    setActivities(savedActivities);
+    setIsRecording(false);
   }
+
+  const notesCount = activities.filter((activity) =>
+    activity.notes.trim(),
+  ).length;
+
+  const sortedActivities = activities
+    .slice()
+    .sort(
+      (activityA, activityB) =>
+        new Date(activityA.eventAt).getTime() -
+        new Date(activityB.eventAt).getTime(),
+    );
 
   return (
     <div
       className="day-panel-backdrop"
       onClick={onClose}
-      data-refresh-key={refreshKey}
     >
       <aside
         className="day-panel"
@@ -51,14 +109,18 @@ export default function DayPanel({
           <button
             type="button"
             className="icon-button"
-            onClick={() => onSelectDate(previousDay(selectedDate))}
+            onClick={() =>
+              onSelectDate(previousDay(activeDate))
+            }
             aria-label="Previous day"
           >
             ←
           </button>
 
           <h2>
-            {new Date(`${selectedDate}T12:00:00`).toLocaleDateString("en-US", {
+            {new Date(
+              `${activeDate}T12:00:00`,
+            ).toLocaleDateString("en-US", {
               weekday: "long",
               month: "long",
               day: "numeric",
@@ -69,7 +131,9 @@ export default function DayPanel({
           <button
             type="button"
             className="icon-button"
-            onClick={() => onSelectDate(nextDay(selectedDate))}
+            onClick={() =>
+              onSelectDate(nextDay(activeDate))
+            }
             aria-label="Next day"
           >
             →
@@ -77,7 +141,10 @@ export default function DayPanel({
         </div>
 
         <section className="info-card">
-          <span className="info-label">Ordered</span>
+          <span className="info-label">
+            Ordered
+          </span>
+
           <strong className="info-value">
             {selectedBlock
               ? `Client ${selectedBlock.client}`
@@ -86,83 +153,105 @@ export default function DayPanel({
         </section>
 
         <section className="info-card">
-          <span className="info-label">Actual</span>
+          <span className="info-label">
+            Actual
+          </span>
+
           <strong className="info-value">
-            {activities.length > 0
-              ? `${activities.length} recorded`
-              : "Pending"}
+            {isLoading
+              ? "Loading..."
+              : activities.length > 0
+                ? `${activities.length} recorded`
+                : "Pending"}
           </strong>
         </section>
 
         <section className="info-card">
-          <span className="info-label">Notes</span>
+          <span className="info-label">
+            Notes
+          </span>
+
           <strong className="info-value">
-            {activities.filter((activity) => activity.notes.trim()).length} notes
+            {isLoading
+              ? "Loading..."
+              : `${notesCount} notes`}
           </strong>
         </section>
 
         <section className="evidence-timeline">
-  <h3>Evidence Timeline</h3>
+          <h3>Evidence Timeline</h3>
 
-  {activities.length === 0 ? (
-    <p className="empty-timeline">
-      No evidence recorded for this day.
-    </p>
-  ) : (
-    activities
-      .slice()
-      .sort(
-        (a, b) =>
-          new Date(a.eventAt).getTime() -
-          new Date(b.eventAt).getTime()
-      )
-      .map((activity) => (
-        <article key={activity.id} className="evidence-item">
-          <div className="evidence-time">
-            {new Date(activity.eventAt).toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-            })}
-          </div>
+          {isLoading ? (
+            <p className="empty-timeline">
+              Loading evidence...
+            </p>
+          ) : sortedActivities.length === 0 ? (
+            <p className="empty-timeline">
+              No evidence recorded for this day.
+            </p>
+          ) : (
+            sortedActivities.map((activity) => (
+              <article
+                key={activity.id}
+                className="evidence-item"
+              >
+                <div className="evidence-time">
+                  {new Date(
+                    activity.eventAt,
+                  ).toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </div>
 
-          <div className="evidence-content">
-            <strong className="evidence-title">
-              {activity.type
-                .replaceAll("-", " ")
-                .replace(/\b\w/g, (letter) => letter.toUpperCase())}
-            </strong>
+                <div className="evidence-content">
+                  <strong className="evidence-title">
+                    {activity.type
+                      .replaceAll("-", " ")
+                      .replace(
+                        /\b\w/g,
+                        (letter) =>
+                          letter.toUpperCase(),
+                      )}
+                  </strong>
 
-            <span className="evidence-client">
-              {activity.client === "client-a"
-                ? "Client A"
-                : "Client B"}
-            </span>
+                  <span className="evidence-client">
+                    {activity.client === "client-a"
+                      ? "Client A"
+                      : "Client B"}
+                  </span>
 
-            {activity.notes.trim() && (
-              <p>{activity.notes}</p>
-            )}
-          </div>
-        </article>
-      ))
-  )}
-</section>
+                  {activity.notes.trim() && (
+                    <p>{activity.notes}</p>
+                  )}
+                </div>
+              </article>
+            ))
+          )}
+        </section>
 
         {isRecording ? (
-          <RecordActivityForm
-            selectedDate={selectedDate}
-            onSaved={handleSaved}
-            onCancel={() => setIsRecording(false)}
+          <EvidenceForm
+            selectedDate={activeDate}
+            onSaved={() => {
+              void handleSaved();
+            }}
+            onCancel={() =>
+              setIsRecording(false)
+            }
           />
         ) : (
           <button
             type="button"
             className="primary-button"
-            onClick={() => setIsRecording(true)}
+            onClick={() =>
+              setIsRecording(true)
+            }
           >
-Add Evidence
+            Add Evidence
           </button>
         )}
       </aside>
     </div>
-  )
+  );
 }

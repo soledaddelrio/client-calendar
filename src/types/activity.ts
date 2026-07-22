@@ -1,3 +1,13 @@
+export type EvidenceCategory =
+  | "exchange"
+  | "communication"
+  | "expense"
+  | "photo"
+  | "document"
+  | "school"
+  | "medical"
+  | "note";
+
 export type ActivityType =
   | "pickup"
   | "dropoff"
@@ -6,7 +16,9 @@ export type ActivityType =
   | "early-dropoff"
   | "note";
 
-export type ActivityClient = "client-a" | "client-b";
+export type ActivityClient =
+  | "client-a"
+  | "client-b";
 
 export type EntryMethod =
   | "live"
@@ -28,6 +40,8 @@ export type ReviewStatus =
 
 export interface ActivityRecord {
   id: string;
+
+  category: EvidenceCategory;
 
   eventAt: string;
   sourceAt?: string;
