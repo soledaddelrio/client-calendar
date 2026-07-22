@@ -10,3 +10,10 @@ html {
 body {
   min-width: 320px;
 }
+.fc .selected-day {
+  background-color: rgba(119, 212, 249, 0.25) !important;
+}
+
+.fc .selected-day.fc-day-today {
+  background-color: rgba(119, 212, 249, 0.4) !important;
+}
