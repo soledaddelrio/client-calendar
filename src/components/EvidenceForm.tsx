@@ -3,11 +3,7 @@ import type {
   ActivityClient,
   ActivityRecord,
   ActivityType,
-  CommunicationMethod,
   EvidenceCategory,
-  ExchangeStatus,
-  ExpenseStatus,
-  ReimbursementStatus,
 } from "../types/activity";
 import {
   addActivity,
@@ -21,51 +17,54 @@ interface EvidenceFormProps {
   onCancel: () => void;
 }
 
+type ExchangeStatus =
+  | "completed"
+  | "late"
+  | "missed"
+  | "cancelled"
+  | "changed";
+
+type CommunicationMethod =
+  | "sms"
+  | "email"
+  | "whatsapp"
+  | "phone-call"
+  | "voicemail"
+  | "parenting-app"
+  | "in-person"
+  | "other";
+
+type ExpenseStatus =
+  | "paid"
+  | "unpaid"
+  | "partially-paid"
+  | "disputed";
+
+type ReimbursementStatus =
+  | "not-applicable"
+  | "not-requested"
+  | "requested"
+  | "partially-reimbursed"
+  | "reimbursed"
+  | "disputed";
+
 const categories: Array<{
   value: EvidenceCategory;
   label: string;
   icon: string;
 }> = [
-  {
-    value: "exchange",
-    label: "Exchange",
-    icon: "📍",
-  },
+  { value: "exchange", label: "Exchange", icon: "📍" },
   {
     value: "communication",
     label: "Communication",
     icon: "💬",
   },
-  {
-    value: "expense",
-    label: "Expense",
-    icon: "💰",
-  },
-  {
-    value: "photo",
-    label: "Photo",
-    icon: "📷",
-  },
-  {
-    value: "document",
-    label: "Document",
-    icon: "📄",
-  },
-  {
-    value: "school",
-    label: "School",
-    icon: "🏫",
-  },
-  {
-    value: "medical",
-    label: "Medical",
-    icon: "🩺",
-  },
-  {
-    value: "note",
-    label: "General Note",
-    icon: "📝",
-  },
+  { value: "expense", label: "Expense", icon: "💰" },
+  { value: "photo", label: "Photo", icon: "📷" },
+  { value: "document", label: "Document", icon: "📄" },
+  { value: "school", label: "School", icon: "🏫" },
+  { value: "medical", label: "Medical", icon: "🩺" },
+  { value: "note", label: "General Note", icon: "📝" },
 ];
 
 export default function EvidenceForm({
@@ -74,234 +73,176 @@ export default function EvidenceForm({
   onSaved,
   onCancel,
 }: EvidenceFormProps) {
+  const existingDetails = existingActivity?.details as
+    | {
+        exchange?: Record<string, unknown>;
+        communication?: Record<string, unknown>;
+        expense?: Record<string, unknown>;
+      }
+    | undefined;
+
+  const exchange = existingDetails?.exchange;
+  const communication = existingDetails?.communication;
+  const expense = existingDetails?.expense;
+
   const initialCategory =
     existingActivity?.category ??
     getLegacyCategory(existingActivity);
 
-  const existingExchange =
-    existingActivity?.details?.exchange;
-
-  const existingCommunication =
-    existingActivity?.details?.communication;
-
-  const existingExpense =
-    existingActivity?.details?.expense;
-
   const legacyCommunication =
-    parseLegacyCommunication(
-      existingActivity?.notes,
-    );
+    parseLegacyCommunication(existingActivity?.notes);
 
   const [category, setCategory] =
-    useState<EvidenceCategory>(
-      initialCategory,
-    );
+    useState<EvidenceCategory>(initialCategory);
 
-  const [type, setType] =
-    useState<ActivityType>(
-      existingActivity?.type ?? "pickup",
-    );
+  const [type, setType] = useState<ActivityType>(
+    existingActivity?.type ?? "pickup",
+  );
 
   const [time, setTime] = useState(
     existingActivity
-      ? getTimeFromEventAt(
-          existingActivity.eventAt,
-        )
+      ? getTimeFromEventAt(existingActivity.eventAt)
       : "18:00",
   );
 
   const [notes, setNotes] = useState(
-    getInitialNotes(existingActivity),
+    initialCategory === "communication" &&
+      !communication
+      ? legacyCommunication.details
+      : existingActivity?.notes ?? "",
   );
 
+  const [relatedClient, setRelatedClient] =
+    useState<ActivityClient>(
+      existingActivity?.client ?? "client-b",
+    );
+
   // Exchange
-  const [
-    scheduledFrom,
-    setScheduledFrom,
-  ] = useState<ActivityClient>(
-    existingExchange?.scheduledFrom ??
-      "client-a",
-  );
+  const [scheduledFrom, setScheduledFrom] =
+    useState<ActivityClient>(
+      readClient(exchange?.scheduledFrom, "client-a"),
+    );
 
   const [scheduledTo, setScheduledTo] =
     useState<ActivityClient>(
-      existingExchange?.scheduledTo ??
-        "client-b",
+      readClient(exchange?.scheduledTo, "client-b"),
     );
 
-  const [
-    actualPerformedBy,
-    setActualPerformedBy,
-  ] = useState<ActivityClient>(
-    existingExchange?.actualPerformedBy ??
-      existingActivity?.client ??
-      "client-b",
-  );
-
-  const [
-    actualReceivedBy,
-    setActualReceivedBy,
-  ] = useState<ActivityClient>(
-    existingExchange?.actualReceivedBy ??
-      "client-b",
-  );
-
-  const [
-    exchangeStatus,
-    setExchangeStatus,
-  ] = useState<ExchangeStatus>(
-    existingExchange?.status ??
-      getStatusFromType(
-        existingActivity?.type,
+  const [actualPerformedBy, setActualPerformedBy] =
+    useState<ActivityClient>(
+      readClient(
+        exchange?.actualPerformedBy,
+        existingActivity?.client ?? "client-b",
       ),
-  );
-
-  const [
-    scheduledTime,
-    setScheduledTime,
-  ] = useState(
-    existingExchange?.scheduledTime ??
-      time,
-  );
-
-  const [actualTime, setActualTime] =
-    useState(
-      existingExchange?.actualTime ??
-        time,
     );
 
-  const [
-    delayMinutes,
-    setDelayMinutes,
-  ] = useState(
-    existingExchange?.delayMinutes?.toString() ??
-      "",
+  const [actualReceivedBy, setActualReceivedBy] =
+    useState<ActivityClient>(
+      readClient(exchange?.actualReceivedBy, "client-a"),
+    );
+
+  const [exchangeStatus, setExchangeStatus] =
+    useState<ExchangeStatus>(
+      readExchangeStatus(
+        exchange?.status,
+        getStatusFromType(existingActivity?.type),
+      ),
+    );
+
+  const [scheduledTime, setScheduledTime] = useState(
+    readString(exchange?.scheduledTime, time),
   );
 
-  const [location, setLocation] =
-    useState(
-      existingExchange?.location ?? "",
-    );
+  const [actualTime, setActualTime] = useState(
+    readString(exchange?.actualTime, time),
+  );
+
+  const [delayMinutes, setDelayMinutes] = useState(
+    readNumberString(exchange?.delayMinutes),
+  );
+
+  const [location, setLocation] = useState(
+    readString(exchange?.location),
+  );
 
   // Communication
-  const [
-    communicationFrom,
-    setCommunicationFrom,
-  ] = useState<ActivityClient>(
-    existingCommunication?.from ??
-      getLegacyCommunicationFrom(
-        legacyCommunication.direction,
-        existingActivity?.client,
+  const [communicationMethod, setCommunicationMethod] =
+    useState<CommunicationMethod>(
+      readCommunicationMethod(
+        communication?.method,
+        legacyCommunication.method,
       ),
-  );
+    );
 
-  const [
-    communicationTo,
-    setCommunicationTo,
-  ] = useState<ActivityClient>(
-    existingCommunication?.to ??
-      oppositeClient(
-        getLegacyCommunicationFrom(
-          legacyCommunication.direction,
-          existingActivity?.client,
+  const [communicationFrom, setCommunicationFrom] =
+    useState<ActivityClient>(
+      readClient(
+        communication?.from,
+        existingActivity?.client ?? "client-b",
+      ),
+    );
+
+  const [communicationTo, setCommunicationTo] =
+    useState<ActivityClient>(
+      readClient(
+        communication?.to,
+        oppositeClient(
+          existingActivity?.client ?? "client-b",
         ),
       ),
+    );
+
+  const [communicationSubject, setCommunicationSubject] =
+    useState(
+      readString(
+        communication?.subject,
+        legacyCommunication.subject,
+      ),
+    );
+
+  const [requiresResponse, setRequiresResponse] = useState(
+    readBoolean(communication?.requiresResponse),
   );
 
-  const [
-    communicationMethod,
-    setCommunicationMethod,
-  ] = useState<CommunicationMethod>(
-    existingCommunication?.method ??
-      legacyCommunication.method,
-  );
-
-  const [
-    communicationSubject,
-    setCommunicationSubject,
-  ] = useState(
-    existingCommunication?.subject ??
-      legacyCommunication.subject,
-  );
-
-  const [
-    requiresResponse,
-    setRequiresResponse,
-  ] = useState(
-    existingCommunication?.requiresResponse ??
-      false,
-  );
-
-  const [
-    responseReceived,
-    setResponseReceived,
-  ] = useState(
-    existingCommunication?.responseReceived ??
-      false,
+  const [responseReceived, setResponseReceived] = useState(
+    readBoolean(communication?.responseReceived),
   );
 
   // Expense
   const [amount, setAmount] = useState(
-    existingExpense?.amount?.toString() ??
-      "",
+    readNumberString(expense?.amount),
   );
 
-  const [currency, setCurrency] =
-    useState(
-      existingExpense?.currency ?? "USD",
-    );
-
-  const [paidBy, setPaidBy] =
-    useState<ActivityClient>(
-      existingExpense?.paidBy ??
-        existingActivity?.client ??
-        "client-a",
-    );
-
-  const [expenseFor, setExpenseFor] =
-    useState(
-      existingExpense?.expenseFor ?? "",
-    );
-
-  const [merchant, setMerchant] =
-    useState(
-      existingExpense?.merchant ?? "",
-    );
-
-  const [
-    expenseStatus,
-    setExpenseStatus,
-  ] = useState<ExpenseStatus>(
-    existingExpense?.expenseStatus ??
-      "paid",
+  const [currency, setCurrency] = useState(
+    readString(expense?.currency, "USD"),
   );
 
-  const [
-    reimbursementStatus,
-    setReimbursementStatus,
-  ] = useState<ReimbursementStatus>(
-    existingExpense?.reimbursementStatus ??
-      "not-requested",
+  const [paidBy, setPaidBy] = useState<ActivityClient>(
+    readClient(
+      expense?.paidBy,
+      existingActivity?.client ?? "client-a",
+    ),
   );
 
-  const [
-    reimbursementAmount,
-    setReimbursementAmount,
-  ] = useState(
-    existingExpense?.reimbursementAmount?.toString() ??
-      "",
+  const [expenseFor, setExpenseFor] = useState(
+    readString(expense?.expenseFor),
   );
 
-  const [dueDate, setDueDate] =
-    useState(
-      existingExpense?.dueDate ?? "",
+  const [merchant, setMerchant] = useState(
+    readString(expense?.merchant),
+  );
+
+  const [expenseStatus, setExpenseStatus] =
+    useState<ExpenseStatus>(
+      readExpenseStatus(expense?.status),
     );
 
-  // Other categories
-  const [relatedClient, setRelatedClient] =
-    useState<ActivityClient>(
-      existingActivity?.client ??
-        "client-b",
+  const [reimbursementStatus, setReimbursementStatus] =
+    useState<ReimbursementStatus>(
+      readReimbursementStatus(
+        expense?.reimbursementStatus ??
+          expense?.reimbursement,
+      ),
     );
 
   function handleCategoryChange(
@@ -311,82 +252,9 @@ export default function EvidenceForm({
 
     if (newCategory === "exchange") {
       setType("pickup");
-      return;
+    } else {
+      setType("note");
     }
-
-    if (
-      newCategory === "communication"
-    ) {
-      setType(
-        getCommunicationActivityType(
-          communicationMethod,
-        ),
-      );
-      return;
-    }
-
-    if (newCategory === "expense") {
-      setType("expense");
-      return;
-    }
-
-    if (newCategory === "photo") {
-      setType("photo");
-      return;
-    }
-
-    if (newCategory === "document") {
-      setType("document");
-      return;
-    }
-
-    if (newCategory === "school") {
-      setType("school-event");
-      return;
-    }
-
-    if (newCategory === "medical") {
-      setType("medical-event");
-      return;
-    }
-
-    setType("note");
-  }
-
-  function buildActivityType(): ActivityType {
-    if (category === "exchange") {
-      return type;
-    }
-
-    if (
-      category === "communication"
-    ) {
-      return getCommunicationActivityType(
-        communicationMethod,
-      );
-    }
-
-    if (category === "expense") {
-      return "expense";
-    }
-
-    if (category === "photo") {
-      return "photo";
-    }
-
-    if (category === "document") {
-      return "document";
-    }
-
-    if (category === "school") {
-      return "school-event";
-    }
-
-    if (category === "medical") {
-      return "medical-event";
-    }
-
-    return "note";
   }
 
   function getPrimaryClient(): ActivityClient {
@@ -394,9 +262,7 @@ export default function EvidenceForm({
       return actualPerformedBy;
     }
 
-    if (
-      category === "communication"
-    ) {
+    if (category === "communication") {
       return communicationFrom;
     }
 
@@ -408,9 +274,13 @@ export default function EvidenceForm({
   }
 
   function buildDetails(): ActivityRecord["details"] {
+    const previous =
+      (existingActivity?.details as Record<string, unknown>) ??
+      {};
+
     if (category === "exchange") {
       return {
-        ...existingActivity?.details,
+        ...previous,
         exchange: {
           scheduledFrom,
           scheduledTo,
@@ -418,39 +288,40 @@ export default function EvidenceForm({
           actualReceivedBy,
           status: exchangeStatus,
           scheduledTime,
-          actualTime,
+          actualTime:
+            exchangeStatus === "missed"
+              ? undefined
+              : actualTime,
           delayMinutes:
             delayMinutes.trim() === ""
               ? undefined
               : Number(delayMinutes),
-          location:
-            location.trim() ||
-            undefined,
+          location: location.trim() || undefined,
         },
-      };
+      } as ActivityRecord["details"];
     }
 
-    if (
-      category === "communication"
-    ) {
+    if (category === "communication") {
       return {
-        ...existingActivity?.details,
+        ...previous,
         communication: {
+          method: communicationMethod,
           from: communicationFrom,
           to: communicationTo,
-          method: communicationMethod,
           subject:
-            communicationSubject.trim() ||
-            undefined,
+            communicationSubject.trim() || undefined,
           requiresResponse,
-          responseReceived,
+          responseReceived:
+            requiresResponse
+              ? responseReceived
+              : false,
         },
-      };
+      } as ActivityRecord["details"];
     }
 
     if (category === "expense") {
       return {
-        ...existingActivity?.details,
+        ...previous,
         expense: {
           amount:
             amount.trim() === ""
@@ -458,25 +329,12 @@ export default function EvidenceForm({
               : Number(amount),
           currency,
           paidBy,
-          expenseFor:
-            expenseFor.trim() ||
-            undefined,
-          merchant:
-            merchant.trim() ||
-            undefined,
-          expenseStatus,
+          expenseFor: expenseFor.trim() || undefined,
+          merchant: merchant.trim() || undefined,
+          status: expenseStatus,
           reimbursementStatus,
-          reimbursementAmount:
-            reimbursementAmount.trim() ===
-            ""
-              ? undefined
-              : Number(
-                  reimbursementAmount,
-                ),
-          dueDate:
-            dueDate || undefined,
         },
-      };
+      } as ActivityRecord["details"];
     }
 
     return existingActivity?.details;
@@ -495,30 +353,26 @@ export default function EvidenceForm({
         crypto.randomUUID(),
       category,
       eventAt: `${selectedDate}T${time}`,
-      sourceAt:
-        existingActivity?.sourceAt,
+      sourceAt: existingActivity?.sourceAt,
       createdAt:
-        existingActivity?.createdAt ??
-        now,
+        existingActivity?.createdAt ?? now,
       updatedAt: now,
-      type: buildActivityType(),
+      type:
+        category === "exchange"
+          ? type
+          : "note",
       client: getPrimaryClient(),
       notes: notes.trim(),
       details: buildDetails(),
       entryMethod:
-        existingActivity?.entryMethod ??
-        "live",
-      sourceType:
-        existingActivity?.sourceType,
+        existingActivity?.entryMethod ?? "live",
+      sourceType: existingActivity?.sourceType,
       sourceFiles:
-        existingActivity?.sourceFiles ??
-        [],
+        existingActivity?.sourceFiles ?? [],
       isApproximate:
-        existingActivity?.isApproximate ??
-        false,
+        existingActivity?.isApproximate ?? false,
       reviewStatus:
-        existingActivity?.reviewStatus ??
-        "confirmed",
+        existingActivity?.reviewStatus ?? "confirmed",
     };
 
     if (existingActivity) {
@@ -545,15 +399,11 @@ export default function EvidenceForm({
         {categories.map((item) => (
           <EvidenceCategoryButton
             key={item.value}
-            active={
-              category === item.value
-            }
+            active={category === item.value}
             icon={item.icon}
             label={item.label}
             onClick={() =>
-              handleCategoryChange(
-                item.value,
-              )
+              handleCategoryChange(item.value)
             }
           />
         ))}
@@ -569,30 +419,22 @@ export default function EvidenceForm({
               value={type}
               onChange={(event) =>
                 setType(
-                  event.target
-                    .value as ActivityType,
+                  event.target.value as ActivityType,
                 )
               }
             >
-              <option value="pickup">
-                Pickup
-              </option>
-
-              <option value="dropoff">
-                Drop-off
-              </option>
-
+              <option value="pickup">Pickup</option>
+              <option value="dropoff">Drop-off</option>
               <option value="missed-exchange">
                 Missed exchange
               </option>
-
               <option value="late-pickup">
                 Late pickup
               </option>
-
               <option value="early-dropoff">
                 Early drop-off
               </option>
+              <option value="note">Note</option>
             </select>
           </label>
 
@@ -600,13 +442,13 @@ export default function EvidenceForm({
             <h5>Scheduled</h5>
 
             <ClientField
-              label="From"
+              label="Scheduled from"
               client={scheduledFrom}
               setClient={setScheduledFrom}
             />
 
             <ClientField
-              label="To"
+              label="Scheduled to"
               client={scheduledTo}
               setClient={setScheduledTo}
             />
@@ -624,17 +466,13 @@ export default function EvidenceForm({
             <ClientField
               label="Performed by"
               client={actualPerformedBy}
-              setClient={
-                setActualPerformedBy
-              }
+              setClient={setActualPerformedBy}
             />
 
             <ClientField
               label="Received by"
               client={actualReceivedBy}
-              setClient={
-                setActualReceivedBy
-              }
+              setClient={setActualReceivedBy}
             />
 
             <label>
@@ -643,38 +481,29 @@ export default function EvidenceForm({
                 value={exchangeStatus}
                 onChange={(event) =>
                   setExchangeStatus(
-                    event.target
-                      .value as ExchangeStatus,
+                    event.target.value as ExchangeStatus,
                   )
                 }
               >
                 <option value="completed">
                   Completed
                 </option>
-
-                <option value="late">
-                  Late
-                </option>
-
-                <option value="missed">
-                  Missed
-                </option>
-
+                <option value="late">Late</option>
+                <option value="missed">Missed</option>
                 <option value="cancelled">
                   Cancelled
                 </option>
-
-                <option value="changed">
-                  Changed
-                </option>
+                <option value="changed">Changed</option>
               </select>
             </label>
 
-            <TimeField
-              label="Actual time"
-              time={actualTime}
-              setTime={setActualTime}
-            />
+            {exchangeStatus !== "missed" && (
+              <TimeField
+                label="Actual time"
+                time={actualTime}
+                setTime={setActualTime}
+              />
+            )}
 
             <label>
               Delay in minutes
@@ -684,9 +513,7 @@ export default function EvidenceForm({
                 step="1"
                 value={delayMinutes}
                 onChange={(event) =>
-                  setDelayMinutes(
-                    event.target.value,
-                  )
+                  setDelayMinutes(event.target.value)
                 }
                 placeholder="0"
               />
@@ -698,9 +525,7 @@ export default function EvidenceForm({
                 type="text"
                 value={location}
                 onChange={(event) =>
-                  setLocation(
-                    event.target.value,
-                  )
+                  setLocation(event.target.value)
                 }
                 placeholder="School, residence, park..."
               />
@@ -722,8 +547,7 @@ export default function EvidenceForm({
         </div>
       )}
 
-      {category ===
-        "communication" && (
+      {category === "communication" && (
         <div className="communication-fields">
           <h4>Communication Details</h4>
 
@@ -731,54 +555,40 @@ export default function EvidenceForm({
             Method
             <select
               value={communicationMethod}
-              onChange={(event) => {
-                const method =
-                  event.target
-                    .value as CommunicationMethod;
-
+              onChange={(event) =>
                 setCommunicationMethod(
-                  method,
-                );
-
-                setType(
-                  getCommunicationActivityType(
-                    method,
-                  ),
-                );
-              }}
+                  event.target
+                    .value as CommunicationMethod,
+                )
+              }
             >
               <option value="sms">
                 SMS / Text message
               </option>
-
-              <option value="email">
-                Email
-              </option>
-
+              <option value="email">Email</option>
               <option value="whatsapp">
                 WhatsApp
               </option>
-
               <option value="phone-call">
                 Phone call
               </option>
-
+              <option value="voicemail">
+                Voicemail
+              </option>
+              <option value="parenting-app">
+                Parenting app
+              </option>
               <option value="in-person">
                 In person
               </option>
-
-              <option value="other">
-                Other
-              </option>
+              <option value="other">Other</option>
             </select>
           </label>
 
           <ClientField
             label="From"
             client={communicationFrom}
-            setClient={
-              setCommunicationFrom
-            }
+            setClient={setCommunicationFrom}
           />
 
           <ClientField
@@ -824,9 +634,7 @@ export default function EvidenceForm({
             <label className="checkbox-field">
               <input
                 type="checkbox"
-                checked={
-                  responseReceived
-                }
+                checked={responseReceived}
                 onChange={(event) =>
                   setResponseReceived(
                     event.target.checked,
@@ -858,9 +666,7 @@ export default function EvidenceForm({
               step="0.01"
               value={amount}
               onChange={(event) =>
-                setAmount(
-                  event.target.value,
-                )
+                setAmount(event.target.value)
               }
               placeholder="0.00"
               required
@@ -872,22 +678,12 @@ export default function EvidenceForm({
             <select
               value={currency}
               onChange={(event) =>
-                setCurrency(
-                  event.target.value,
-                )
+                setCurrency(event.target.value)
               }
             >
-              <option value="USD">
-                USD
-              </option>
-
-              <option value="CRC">
-                CRC
-              </option>
-
-              <option value="EUR">
-                EUR
-              </option>
+              <option value="USD">USD</option>
+              <option value="CRC">CRC</option>
+              <option value="EUR">EUR</option>
             </select>
           </label>
 
@@ -899,55 +695,15 @@ export default function EvidenceForm({
 
           <label>
             Expense for
-            <select
+            <input
+              type="text"
               value={expenseFor}
               onChange={(event) =>
-                setExpenseFor(
-                  event.target.value,
-                )
+                setExpenseFor(event.target.value)
               }
+              placeholder="Tuition, medical, activity..."
               required
-            >
-              <option value="">
-                Select category
-              </option>
-
-              <option value="Tuition">
-                Tuition
-              </option>
-
-              <option value="School">
-                School
-              </option>
-
-              <option value="Medical">
-                Medical
-              </option>
-
-              <option value="Activities">
-                Activities
-              </option>
-
-              <option value="Clothing">
-                Clothing
-              </option>
-
-              <option value="Travel">
-                Travel
-              </option>
-
-              <option value="Food">
-                Food
-              </option>
-
-              <option value="Insurance">
-                Insurance
-              </option>
-
-              <option value="Other">
-                Other
-              </option>
-            </select>
+            />
           </label>
 
           <label>
@@ -956,9 +712,7 @@ export default function EvidenceForm({
               type="text"
               value={merchant}
               onChange={(event) =>
-                setMerchant(
-                  event.target.value,
-                )
+                setMerchant(event.target.value)
               }
               placeholder="School, doctor, store..."
             />
@@ -970,31 +724,15 @@ export default function EvidenceForm({
               value={expenseStatus}
               onChange={(event) =>
                 setExpenseStatus(
-                  event.target
-                    .value as ExpenseStatus,
+                  event.target.value as ExpenseStatus,
                 )
               }
             >
-              <option value="paid">
-                Paid
-              </option>
-
-              <option value="unpaid">
-                Unpaid
-              </option>
-
+              <option value="paid">Paid</option>
+              <option value="unpaid">Unpaid</option>
               <option value="partially-paid">
                 Partially paid
               </option>
-
-              <option value="reimbursement-requested">
-                Reimbursement requested
-              </option>
-
-              <option value="reimbursed">
-                Reimbursed
-              </option>
-
               <option value="disputed">
                 Disputed
               </option>
@@ -1004,9 +742,7 @@ export default function EvidenceForm({
           <label>
             Reimbursement
             <select
-              value={
-                reimbursementStatus
-              }
+              value={reimbursementStatus}
               onChange={(event) =>
                 setReimbursementStatus(
                   event.target
@@ -1017,58 +753,22 @@ export default function EvidenceForm({
               <option value="not-applicable">
                 Not applicable
               </option>
-
               <option value="not-requested">
                 Not requested
               </option>
-
               <option value="requested">
                 Requested
               </option>
-
               <option value="partially-reimbursed">
                 Partially reimbursed
               </option>
-
               <option value="reimbursed">
                 Reimbursed
               </option>
-
               <option value="disputed">
                 Disputed
               </option>
             </select>
-          </label>
-
-          <label>
-            Reimbursement amount
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={
-                reimbursementAmount
-              }
-              onChange={(event) =>
-                setReimbursementAmount(
-                  event.target.value,
-                )
-              }
-              placeholder="0.00"
-            />
-          </label>
-
-          <label>
-            Due date
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(event) =>
-                setDueDate(
-                  event.target.value,
-                )
-              }
-            />
           </label>
 
           <TimeField
@@ -1087,23 +787,17 @@ export default function EvidenceForm({
       )}
 
       {category !== "exchange" &&
-        category !==
-          "communication" &&
+        category !== "communication" &&
         category !== "expense" && (
           <div className="general-evidence-fields">
             <h4>
-              {getCategoryLabel(
-                category,
-              )}{" "}
-              Details
+              {getCategoryLabel(category)} Details
             </h4>
 
             <ClientField
               label="Related to"
               client={relatedClient}
-              setClient={
-                setRelatedClient
-              }
+              setClient={setRelatedClient}
             />
 
             <TimeField
@@ -1167,7 +861,6 @@ function EvidenceCategoryButton({
       <span className="evidence-type-icon">
         {icon}
       </span>
-
       <span>{label}</span>
     </button>
   );
@@ -1176,9 +869,7 @@ function EvidenceCategoryButton({
 interface ClientFieldProps {
   label: string;
   client: ActivityClient;
-  setClient: (
-    client: ActivityClient,
-  ) => void;
+  setClient: (client: ActivityClient) => void;
 }
 
 function ClientField({
@@ -1193,17 +884,15 @@ function ClientField({
         value={client}
         onChange={(event) =>
           setClient(
-            event.target
-              .value as ActivityClient,
+            event.target.value as ActivityClient,
           )
         }
       >
         <option value="client-a">
-          Client A
+          Parent 1
         </option>
-
         <option value="client-b">
-          Client B
+          Parent 2
         </option>
       </select>
     </label>
@@ -1264,31 +953,8 @@ function NotesField({
   );
 }
 
-function getInitialNotes(
-  activity?: ActivityRecord,
-) {
-  if (!activity) {
-    return "";
-  }
-
-  if (
-    activity.category ===
-      "communication" &&
-    !activity.details?.communication
-  ) {
-    return parseLegacyCommunication(
-      activity.notes,
-    ).details;
-  }
-
-  return activity.notes;
-}
-
-function getTimeFromEventAt(
-  eventAt: string,
-) {
+function getTimeFromEventAt(eventAt: string) {
   const time = eventAt.split("T")[1];
-
   return time?.slice(0, 5) || "18:00";
 }
 
@@ -1329,54 +995,15 @@ function oppositeClient(
     : "client-a";
 }
 
-function getLegacyCommunicationFrom(
-  direction: string,
-  client?: ActivityClient,
-): ActivityClient {
-  if (client) {
-    return client;
-  }
-
-  return direction === "sent"
-    ? "client-a"
-    : "client-b";
-}
-
-function getCommunicationActivityType(
-  method: CommunicationMethod,
-): ActivityType {
-  if (method === "email") {
-    return "email";
-  }
-
-  if (method === "phone-call") {
-    return "phone-call";
-  }
-
-  if (
-    method === "sms" ||
-    method === "whatsapp"
-  ) {
-    return "text-message";
-  }
-
-  return "note";
-}
-
 function parseLegacyCommunication(
   notes = "",
 ): {
   method: CommunicationMethod;
-  direction: string;
   subject: string;
   details: string;
 } {
   const methodMatch = notes.match(
     /^Communication method:\s*(.+)$/m,
-  );
-
-  const directionMatch = notes.match(
-    /^Direction:\s*(.+)$/m,
   );
 
   const subjectMatch = notes.match(
@@ -1388,30 +1015,79 @@ function parseLegacyCommunication(
   );
 
   return {
-    method:
-      toCommunicationMethod(
-        methodMatch?.[1],
-      ),
-    direction:
-      directionMatch?.[1]
-        ?.trim()
-        .toLowerCase() ?? "received",
+    method: readCommunicationMethod(
+      methodMatch?.[1],
+      "sms",
+    ),
     subject:
-      subjectMatch?.[1]?.trim() ??
-      "",
+      subjectMatch?.[1]?.trim() ?? "",
     details:
-      detailsMatch?.[1]?.trim() ??
-      notes,
+      detailsMatch?.[1]?.trim() ?? notes,
   };
 }
 
-function toCommunicationMethod(
-  value?: string,
+function readString(
+  value: unknown,
+  fallback = "",
+) {
+  return typeof value === "string"
+    ? value
+    : fallback;
+}
+
+function readBoolean(value: unknown) {
+  return typeof value === "boolean"
+    ? value
+    : false;
+}
+
+function readNumberString(value: unknown) {
+  return typeof value === "number" &&
+    Number.isFinite(value)
+    ? String(value)
+    : "";
+}
+
+function readClient(
+  value: unknown,
+  fallback: ActivityClient,
+): ActivityClient {
+  return value === "client-a" ||
+    value === "client-b"
+    ? value
+    : fallback;
+}
+
+function readExchangeStatus(
+  value: unknown,
+  fallback: ExchangeStatus,
+): ExchangeStatus {
+  const valid: ExchangeStatus[] = [
+    "completed",
+    "late",
+    "missed",
+    "cancelled",
+    "changed",
+  ];
+
+  return valid.includes(
+    value as ExchangeStatus,
+  )
+    ? (value as ExchangeStatus)
+    : fallback;
+}
+
+function readCommunicationMethod(
+  value: unknown,
+  fallback: CommunicationMethod,
 ): CommunicationMethod {
-  const normalized = value
-    ?.trim()
-    .toLowerCase()
-    .replaceAll(" ", "-");
+  const normalized =
+    typeof value === "string"
+      ? value
+          .trim()
+          .toLowerCase()
+          .replaceAll(" ", "-")
+      : "";
 
   if (
     normalized === "text-message" ||
@@ -1420,29 +1096,69 @@ function toCommunicationMethod(
     return "sms";
   }
 
-  if (
-    normalized === "parenting-app" ||
-    normalized === "whatsapp"
-  ) {
-    return "whatsapp";
-  }
-
   if (normalized === "email") {
     return "email";
   }
 
-  if (
-    normalized === "phone-call" ||
-    normalized === "voicemail"
-  ) {
+  if (normalized === "whatsapp") {
+    return "whatsapp";
+  }
+
+  if (normalized === "phone-call") {
     return "phone-call";
+  }
+
+  if (normalized === "voicemail") {
+    return "voicemail";
+  }
+
+  if (normalized === "parenting-app") {
+    return "parenting-app";
   }
 
   if (normalized === "in-person") {
     return "in-person";
   }
 
-  return "other";
+  if (normalized === "other") {
+    return "other";
+  }
+
+  return fallback;
+}
+
+function readExpenseStatus(
+  value: unknown,
+): ExpenseStatus {
+  const valid: ExpenseStatus[] = [
+    "paid",
+    "unpaid",
+    "partially-paid",
+    "disputed",
+  ];
+
+  return valid.includes(value as ExpenseStatus)
+    ? (value as ExpenseStatus)
+    : "paid";
+}
+
+function readReimbursementStatus(
+  value: unknown,
+): ReimbursementStatus {
+  const valid: ReimbursementStatus[] = [
+    "not-applicable",
+    "not-requested",
+    "requested",
+    "partially-reimbursed",
+    "reimbursed",
+    "disputed",
+  ];
+
+  return valid.includes(
+    value as ReimbursementStatus,
+  )
+    ? (value as ReimbursementStatus)
+    : "not-requested";
 }
 
 function getCategoryLabel(
